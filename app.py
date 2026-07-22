@@ -274,7 +274,13 @@ st.markdown(
         .vs-citation, .vs-kv { flex-direction: column; gap: 0.15rem; }
         .vs-citation .vs-citation__score, .vs-kv dd { text-align: left; }
 
-        [data-testid="stMainBlockContainer"] { padding-top: 1.5rem; }
+        /* Enough top padding to clear Streamlit's floating top header (collapse +
+           menu), so the masthead isn't tucked underneath it. */
+        [data-testid="stMainBlockContainer"] { padding-top: 3rem; }
+
+        /* Tighten the masthead so the whole line fits a narrow screen and wraps
+           cleanly instead of being clipped. */
+        .vs-masthead { font-size: 0.6rem; letter-spacing: 0.07em; overflow-wrap: anywhere; }
     }
 
     /* ---- Sidebar ---- */
@@ -774,11 +780,11 @@ if st.session_state.retriever:
 # document uses only the local embedding model, so it works without a key.
 _ready = st.session_state.key_ok and st.session_state.retriever is not None
 if not st.session_state.key_ok:
-    _placeholder = "Enter your OpenAI API key in the sidebar to begin…"
+    _placeholder = "Add your OpenAI key to begin…"
 elif st.session_state.retriever is None:
     _placeholder = "Add a document to begin…"
 else:
-    _placeholder = "Pose a query about your document(s)…"
+    _placeholder = "Ask about your document(s)…"
 
 pending = st.session_state.pop("pending_question", None)
 question = st.chat_input(_placeholder, disabled=not _ready)
