@@ -157,6 +157,29 @@ st.markdown(
         --hover-text: #F8F5F0;
     }
 
+    /* Sidebar locked to a fixed width - no drag-resize - but collapsing is still
+       allowed via Streamlit's own collapse/reopen buttons. The width rule is
+       scoped to [aria-expanded="true"] only: Streamlit toggles that attribute
+       itself to animate collapse, and an unconditional !important width here
+       would fight that same animation (this caused the collapse button's icon
+       to get stuck/duplicated when tried unconditionally). Two resize
+       affordances are neutralized regardless of expanded state: the drag handle
+       on the right edge (emotion "target" class eelgd2m3 in this pinned
+       Streamlit version - see requirements.txt), and a second, wider invisible
+       hit-area for that same handle that carries its cursor as an inline style
+       rather than a class, caught here by attribute selector so it doesn't
+       depend on a hashed/target class name. */
+    [data-testid="stSidebar"][aria-expanded="true"] {
+        width: 452px !important;
+        min-width: 452px !important;
+        max-width: 452px !important;
+    }
+    .eelgd2m3,
+    [data-testid="stSidebar"] [style*="resize"] {
+        display: none !important;
+        pointer-events: none !important;
+    }
+
     [data-testid="stMainBlockContainer"] { max-width: 860px; padding-top: 2.5rem; }
 
     .vs-mono, .vs-eyebrow, .vs-stamp, .vs-masthead,
