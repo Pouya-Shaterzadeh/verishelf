@@ -108,7 +108,7 @@ defaults = {
     "key_ok": False,
     "key_msg": "",
     "models": [],  # discovered from the user's key at runtime
-    "model": settings.OPENAI_MODEL,
+    "model": "",   # set from the user's models once a key is validated
 }
 for key, value in defaults.items():
     st.session_state.setdefault(key, value)
@@ -710,11 +710,17 @@ with st.sidebar:
                 st.session_state.pop(key, None)
         st.rerun()
 
+    # Only show the model once a key is active - before that the model is unknown
+    # (discovered from the user's key), so a placeholder name would be misleading.
+    _model_row = (
+        f'<div class="vs-kv"><dt>Model</dt><dd>{html.escape(st.session_state.model)}</dd></div>'
+        if st.session_state.key_ok and st.session_state.model else ""
+    )
     st.markdown(
         f"""
         <dl class="vs-meta" style="margin-top: 1.4rem;">
             <div class="vs-kv"><dt>Retriever</dt><dd>bm25 &oplus; chroma</dd></div>
-            <div class="vs-kv"><dt>Model</dt><dd>{html.escape(st.session_state.model)}</dd></div>
+            {_model_row}
         </dl>
         """,
         unsafe_allow_html=True,
