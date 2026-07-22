@@ -30,10 +30,11 @@ class AgentState(TypedDict):
     research_future: Optional[Future]
 
 class AgentWorkflow:
-    def __init__(self):
-        self.researcher = ResearchAgent()
-        self.verifier = VerificationAgent()
-        self.relevance_checker = RelevanceChecker()
+    def __init__(self, client, model):
+        # One OpenAI client (built from the user's own key) shared by all three agents.
+        self.researcher = ResearchAgent(client, model)
+        self.verifier = VerificationAgent(client, model)
+        self.relevance_checker = RelevanceChecker(client, model)
         # Shared pool for overlapping independent I/O-bound work (the speculative
         # research draft and the citation scoring) with the main call chain. These
         # are network/local-retrieval waits, so threads - not processes - are the

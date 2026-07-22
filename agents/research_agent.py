@@ -1,24 +1,21 @@
 from typing import Dict, List
 from langchain_core.documents import Document
-from .llm_client import get_client
 import logging
 
 logger = logging.getLogger(__name__)
 
 # Chunks from MarkdownHeaderTextSplitter aren't size-capped (a "chunk" can be a whole
 # page), so an uncapped context can balloon the prompt. Bounded to keep prompts fast
-# and, importantly, to stay under providers' per-minute token limits (Groq's free tier
-# especially) so failover to a secondary provider actually works instead of instantly
-# tripping its token cap. ~4000 chars is still ample grounding for a focused answer.
+# and to keep token usage (billed to the user's own key) reasonable. ~4000 chars is
+# still ample grounding for a focused answer.
 MAX_CONTEXT_CHARS = 4000
 
 
 class ResearchAgent:
-    def __init__(self):
-        """
-        Initialize the research agent with an NVIDIA NIM-backed chat model.
-        """
-        self.client = get_client()  # multi-provider failover client
+    def __init__(self, client, model):
+        """Initialize with an OpenAI client built from the user's own API key."""
+        self.client = client
+        self.model = model
 
     def sanitize_response(self, response_text: str) -> str:
         """
@@ -59,10 +56,10 @@ class ResearchAgent:
         # Create a prompt for the LLM
         prompt = self.generate_prompt(question, context)
 
-        # Call the LLM to generate the answer (with cross-provider failover). Errors
-        # propagate only after every provider fails, so the UI can show a specific
-        # rate-limit message instead of collapsing everything into one generic failure.
-        response = self.client.create(
+        # Call the LLM to generate the answer. Errors propagate so the UI can show a
+        # specific message (e.g. the user's key hit its rate limit).
+        response = self.client.chat.completions.create(
+            model=self.model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
             temperature=0.3,

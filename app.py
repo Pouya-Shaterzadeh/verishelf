@@ -9,7 +9,6 @@ import os
 import re
 import tempfile
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -38,40 +37,23 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Imports that touch config.settings (and therefore require an LLM provider key) are
-# wrapped so a missing key produces a friendly message instead of a raw traceback.
+# Imports wrapped so any setup failure (e.g. a missing system library) shows a friendly
+# message instead of a raw traceback. There is no server-side API key: each visitor
+# brings their own OpenAI key at runtime, so nothing here depends on a configured key.
 try:
     from config import constants
     from config.settings import settings
     from document_processor.file_handler import DocumentProcessor
     from retriever.builder import RetrieverBuilder
     from agents.workflow import AgentWorkflow
-    from agents.llm_client import probe_provider
+    from agents.llm_client import make_client, validate_key
     from openai import RateLimitError, APIError
 except Exception as exc:
-    # Two distinct failure modes land here and shouldn't be conflated: no LLM provider
-    # key configured (the validator names the provider keys) versus any other import-time
-    # failure (e.g. a missing system library). Only show the key-setup steps when the
-    # exception actually names a provider key.
-    _key_names = ("GEMINI_API_KEY", "CEREBRAS_API_KEY", "NVIDIA_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY")
-    if any(k in str(exc) for k in _key_names):
-        st.error("Configuration error")
-        st.markdown(
-            "Verishelf can't start because no **LLM provider key** is set.\n\n"
-            "1. Copy `.env.example` to `.env`\n"
-            "2. Add at least one free key — `GEMINI_API_KEY` ([aistudio.google.com](https://aistudio.google.com)), "
-            "`CEREBRAS_API_KEY` ([cloud.cerebras.ai](https://cloud.cerebras.ai)), "
-            "`NVIDIA_API_KEY` ([build.nvidia.com](https://build.nvidia.com)), "
-            "`GROQ_API_KEY` ([console.groq.com](https://console.groq.com)), or "
-            "`OPENROUTER_API_KEY` ([openrouter.ai/keys](https://openrouter.ai/keys))\n"
-            "3. Restart the app"
-        )
-    else:
-        st.error("Startup error")
-        st.markdown(
-            "Verishelf failed to start due to an unexpected error during setup "
-            "(not the API key). See the technical details below."
-        )
+    st.error("Startup error")
+    st.markdown(
+        "Verishelf failed to start due to an unexpected error during setup. "
+        "See the technical details below."
+    )
     with st.expander("Technical details", expanded=True):
         st.exception(exc)
     st.stop()
@@ -103,27 +85,11 @@ def get_retriever_builder() -> RetrieverBuilder:
 
 
 @st.cache_resource(show_spinner=False)
-def get_workflow() -> AgentWorkflow:
-    return AgentWorkflow()
-
-
-@st.cache_data(ttl=60, show_spinner=False)
-def get_provider_status() -> dict:
-    """Live availability per provider, refreshed at most once a minute (st.cache_data
-    is shared across all sessions, so this is ~3 probe calls/min total regardless of
-    traffic). 'unset' = no key; 'online'/'offline' = a 1-token probe succeeded/failed
-    (offline covers a bad key, an outage, or being rate-limited right now)."""
-    providers = settings.all_providers()
-    status = {p["name"]: "unset" for p in providers if not p["api_key"]}
-    keyed = [p for p in providers if p["api_key"]]
-    with ThreadPoolExecutor(max_workers=max(1, len(keyed))) as ex:
-        futures = {
-            ex.submit(probe_provider, p["base_url"], p["api_key"], p["model"]): p
-            for p in keyed
-        }
-        for fut, p in futures.items():
-            status[p["name"]] = "online" if fut.result() else "offline"
-    return status
+def get_workflow(api_key: str, model: str) -> AgentWorkflow:
+    """One multi-agent workflow per (key, model). Cached so the LangGraph isn't rebuilt
+    on every message; keyed by api_key so each visitor's workflow uses their own key.
+    The key lives only in this cached object in server memory - never persisted."""
+    return AgentWorkflow(make_client(api_key), model)
 
 
 # --------------------------------------------------------------------------
@@ -137,6 +103,11 @@ defaults = {
     "doc_source": None,
     "doc_chunk_count": 0,
     "pending_question": None,
+    # Bring-your-own-key: the visitor's OpenAI key + validation state, session-only.
+    "api_key": "",
+    "key_ok": False,
+    "key_msg": "",
+    "model": settings.OPENAI_MODEL,
 }
 for key, value in defaults.items():
     st.session_state.setdefault(key, value)
@@ -332,19 +303,12 @@ st.markdown(
     .vs-kv dt { color: var(--text-soft); }
     .vs-kv dd { color: var(--text); margin: 0; text-align: right; }
 
-    /* Provider availability status (live probe, refreshed ~once/min) */
-    .vs-status { margin-top: 0.35rem; }
-    .vs-status__row {
-        display: flex; align-items: center; gap: 0.5rem;
-        font-size: 0.78rem; color: var(--text); padding: 0.12rem 0;
-    }
-    .vs-status__dot {
-        width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    }
-    .vs-status__dot--online { background: var(--verified); box-shadow: 0 0 0 3px color-mix(in srgb, var(--verified) 18%, transparent); }
-    .vs-status__dot--offline { background: var(--flagged); box-shadow: 0 0 0 3px color-mix(in srgb, var(--flagged) 18%, transparent); }
-    .vs-status__dot--unset { background: var(--rule); }
-    .vs-status__note { margin-left: auto; font-size: 0.68rem; color: var(--text-soft); letter-spacing: 0.04em; }
+    /* Bring-your-own-key gate */
+    .vs-key { font-size: 0.8rem; font-weight: 600; margin: 0.5rem 0 0.15rem; letter-spacing: 0.01em; }
+    .vs-key--ok { color: var(--verified); }
+    .vs-key--bad { color: var(--flagged); }
+    .vs-key-note { font-size: 0.68rem; color: var(--text-soft); line-height: 1.5; margin-top: 0.35rem; }
+    .vs-key-note a { color: var(--accent) !important; white-space: nowrap; }
 
     /* ---- Verification ledger + citations ---- */
     .vs-ledger-row {
@@ -594,7 +558,7 @@ def ask(question: str):
 
     with st.spinner("Checking relevance, researching, and verifying the answer..."):
         try:
-            result = get_workflow().full_pipeline(
+            result = get_workflow(st.session_state.api_key, st.session_state.model).full_pipeline(
                 question=question, retriever=st.session_state.retriever
             )
             answer = result["draft_answer"]
@@ -604,13 +568,12 @@ def ask(question: str):
             re_researched = result.get("re_researched", False)
         except RateLimitError:
             answer = (
-                "All providers are busy right now — every configured free tier hit its "
-                "per-minute limit at once. (The status dots reflect a check from up to a "
-                "minute ago, so they can lag a sudden spike.) Wait a few seconds and retry."
+                "Your OpenAI key hit a rate or quota limit. Wait a moment and try again, "
+                "or check your usage and billing at platform.openai.com."
             )
             verification, citations, passages_consulted, re_researched = "", [], 0, False
         except APIError as e:
-            answer = f"The model provider returned an error: {e}"
+            answer = f"OpenAI returned an error: {e}"
             verification, citations, passages_consulted, re_researched = "", [], 0, False
         except Exception as e:
             answer = f"Something went wrong while answering: {e}"
@@ -629,6 +592,44 @@ def ask(question: str):
 # Sidebar
 # --------------------------------------------------------------------------
 with st.sidebar:
+    # --- Bring-your-own-key gate -------------------------------------------------
+    # The visitor supplies their own OpenAI key. It lives only in this session's
+    # memory (never written to disk or logs), so usage is billed to them and the app
+    # is safe to share publicly without our own key being drained.
+    st.markdown('<div class="vs-eyebrow vs-eyebrow--lead">Your OpenAI key</div>', unsafe_allow_html=True)
+    _key_in = st.text_input(
+        "OpenAI API key", type="password", placeholder="sk-...",
+        label_visibility="collapsed", key="api_key_input",
+        help="Used only in your browser session — never stored, logged, or sent anywhere except OpenAI.",
+    )
+    # Validate once per distinct entry (models.list costs no tokens). Store the attempt
+    # so an invalid key doesn't re-trigger validation on every rerun.
+    if _key_in != st.session_state.api_key:
+        st.session_state.api_key = _key_in
+        if _key_in:
+            with st.spinner("Verifying key…"):
+                st.session_state.key_ok, st.session_state.key_msg = validate_key(_key_in)
+        else:
+            st.session_state.key_ok, st.session_state.key_msg = False, ""
+
+    if st.session_state.key_ok:
+        st.markdown('<div class="vs-key vs-key--ok">✓ Key active</div>', unsafe_allow_html=True)
+        st.session_state.model = st.selectbox(
+            "Model", settings.OPENAI_MODELS,
+            index=settings.OPENAI_MODELS.index(st.session_state.model)
+            if st.session_state.model in settings.OPENAI_MODELS else 0,
+            label_visibility="collapsed",
+            help="gpt-4o-mini is the cheapest and plenty capable for this.",
+        )
+    elif st.session_state.key_msg:
+        st.markdown(f'<div class="vs-key vs-key--bad">✕ {html.escape(st.session_state.key_msg)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="vs-key-note">Stored only in this browser session — never saved or logged. '
+        '<a href="https://platform.openai.com/api-keys" target="_blank">Get a key ↗</a></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<hr style="border-color: var(--rule); margin: 1.1rem 0 1rem;">', unsafe_allow_html=True)
+
     st.markdown(
         """
         <div class="vs-eyebrow vs-eyebrow--lead">How it works</div>
@@ -688,29 +689,20 @@ with st.sidebar:
     st.markdown('<hr style="border-color: var(--rule); margin: 1.4rem 0 1rem;">', unsafe_allow_html=True)
     if st.button("New dossier", use_container_width=True):
         st.session_state.uploader_nonce += 1
+        # Reset the documents/conversation but KEEP the visitor's key + model so they
+        # don't have to re-enter it for every new dossier.
+        _keep = {"api_key", "key_ok", "key_msg", "model"}
         for key in defaults:
-            st.session_state.pop(key, None)
+            if key not in _keep:
+                st.session_state.pop(key, None)
         st.rerun()
 
-    # Live provider availability: a colored dot per provider (green online, red
-    # offline/rate-limited, grey no key). Cached ~1 min, shared across sessions.
-    _status = get_provider_status()
-    _status_note = {"online": "online", "offline": "unavailable", "unset": "no key"}
-    _status_rows = "".join(
-        f'<div class="vs-status__row">'
-        f'<span class="vs-status__dot vs-status__dot--{_status.get(p["name"], "unset")}"></span>'
-        f'{p["label"]}'
-        f'<span class="vs-status__note">{_status_note[_status.get(p["name"], "unset")]}</span>'
-        f'</div>'
-        for p in settings.all_providers()
-    )
     st.markdown(
         f"""
         <dl class="vs-meta" style="margin-top: 1.4rem;">
             <div class="vs-kv"><dt>Retriever</dt><dd>bm25 &oplus; chroma</dd></div>
+            <div class="vs-kv"><dt>Model</dt><dd>{html.escape(st.session_state.model)}</dd></div>
         </dl>
-        <div class="vs-eyebrow">LLM providers</div>
-        <div class="vs-status">{_status_rows}</div>
         """,
         unsafe_allow_html=True,
     )
@@ -754,20 +746,29 @@ for i, msg in enumerate(st.session_state.messages):
 if st.session_state.retriever:
     st.markdown(
         '<div class="vs-kv" style="max-width: 860px; margin: 0 auto;">'
-        '<dt>Answers are drafted from your corpus only.</dt><dd>nvidia &middot; groq &middot; openrouter</dd>'
+        '<dt>Answers are drafted from your corpus only.</dt><dd>billed to your OpenAI key</dd>'
         "</div>",
         unsafe_allow_html=True,
     )
 
+# The chat is gated on a valid OpenAI key (answering makes LLM calls). Indexing a
+# document uses only the local embedding model, so it works without a key.
+_ready = st.session_state.key_ok and st.session_state.retriever is not None
+if not st.session_state.key_ok:
+    _placeholder = "Enter your OpenAI API key in the sidebar to begin…"
+elif st.session_state.retriever is None:
+    _placeholder = "Add a document to begin…"
+else:
+    _placeholder = "Pose a query about your document(s)…"
+
 pending = st.session_state.pop("pending_question", None)
-question = st.chat_input(
-    "Pose a query about your document(s)..." if st.session_state.retriever else "Add a document to begin...",
-    disabled=st.session_state.retriever is None,
-)
-if pending:
+question = st.chat_input(_placeholder, disabled=not _ready)
+if pending and _ready:
     question = pending
+elif pending and not st.session_state.key_ok:
+    # A sample was opened without a key set - hold the question until the key is in.
+    st.session_state.pending_question = pending
+    st.info("Enter your OpenAI API key in the sidebar, then your sample question will run.")
 
 if question:
     ask(question)
-
-# Deploy marker: clean redeploy to resolve a stale Streamlit Cloud checkout.

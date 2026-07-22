@@ -1,6 +1,5 @@
 from typing import Dict, List
 from langchain_core.documents import Document
-from .llm_client import get_client
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,11 +10,10 @@ MAX_CONTEXT_CHARS = 4000
 
 
 class VerificationAgent:
-    def __init__(self):
-        """
-        Initialize the verification agent with an NVIDIA NIM-backed chat model.
-        """
-        self.client = get_client()  # multi-provider failover client
+    def __init__(self, client, model):
+        """Initialize with an OpenAI client built from the user's own API key."""
+        self.client = client
+        self.model = model
 
     def sanitize_response(self, response_text: str) -> str:
         """
@@ -138,10 +136,10 @@ class VerificationAgent:
         # Create a prompt for the LLM to verify the answer
         prompt = self.generate_prompt(answer, context)
 
-        # Call the LLM to generate the verification report (with cross-provider
-        # failover). Errors propagate only after every provider fails, so the UI can
-        # tell them apart from a genuine "unsupported" verdict.
-        response = self.client.create(
+        # Call the LLM to generate the verification report. Errors propagate so the UI
+        # can tell them apart from a genuine "unsupported" verdict.
+        response = self.client.chat.completions.create(
+            model=self.model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=200,
             temperature=0.0,

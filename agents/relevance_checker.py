@@ -1,12 +1,12 @@
-from .llm_client import get_client
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class RelevanceChecker:
-    def __init__(self):
-        self.client = get_client()  # multi-provider failover client
+    def __init__(self, client, model):
+        self.client = client  # OpenAI client built from the user's own key
+        self.model = model
 
     def check(self, question: str, documents, k=3) -> str:
         """
@@ -50,11 +50,11 @@ class RelevanceChecker:
         **Respond ONLY with one of the following labels: CAN_ANSWER, PARTIAL, NO_MATCH**
         """
 
-        # Call the LLM (with cross-provider failover). Note: API/network/auth errors
-        # are intentionally NOT caught here - only after every provider has failed does
-        # the error propagate, so the UI can tell "the model said no" apart from "all
-        # providers failed" instead of misreporting a real failure as out-of-scope.
-        response = self.client.create(
+        # Call the LLM. API/network/auth errors are intentionally NOT caught here - they
+        # must propagate so the UI can tell a real failure (e.g. the user's key hit its
+        # rate limit) apart from a genuine "this question is out of scope" verdict.
+        response = self.client.chat.completions.create(
+            model=self.model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=10,
             temperature=0.0,

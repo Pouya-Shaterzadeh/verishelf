@@ -21,7 +21,7 @@ This project started from the IBM Skills Network "DocChat" hands-on lab and keep
 
 | Layer | Lab version | This project |
 |---|---|---|
-| LLMs | IBM watsonx.ai, sandbox-only `project_id="skills-network"` | Free-tier models with multi-provider failover (Cerebras · NVIDIA · Groq · OpenRouter), your own API keys |
+| LLMs | IBM watsonx.ai, sandbox-only `project_id="skills-network"` | **Bring-your-own-key** — each visitor enters their own OpenAI key in the app (billed to them, no server-side key) |
 | Embeddings | IBM watsonx embeddings (needs the same sandbox) | Local `sentence-transformers` model — free, no key, runs on CPU |
 | Frontend | Gradio | Streamlit, custom-designed |
 
@@ -56,22 +56,14 @@ pip install -r requirements.txt
 ```
 This pulls in Docling + PyTorch (CPU build) + a local embedding model, so the first install can take a few minutes and a few GB of disk.
 
-### 4. Get free LLM API keys (one or more)
-Verishelf uses **multi-provider failover** across four free, OpenAI-compatible LLM providers — each LLM call is tried against them in order until one succeeds, so a rate limit or outage on one silently falls over to the next. Set **at least one** key; set more for greater resilience. All free, no credit card.
+### 4. No key needed to run it — users bring their own
+Verishelf uses **bring-your-own-key (BYOK)**: there is **no server-side API key**. Each visitor pastes their own **OpenAI API key** into the app's sidebar, and all LLM usage is billed to *their* key and *their* rate limits — so it's safe to deploy publicly, your key can't be drained, and there's nothing to keep secret.
 
-| Provider | Get a free key | Env var | Free tier |
-|---|---|---|---|
-| Cerebras | [cloud.cerebras.ai](https://cloud.cerebras.ai) | `CEREBRAS_API_KEY` | 1M tokens/day, very fast |
-| NVIDIA | [build.nvidia.com](https://build.nvidia.com) | `NVIDIA_API_KEY` | ~40 req/min, no daily cap |
-| Groq | [console.groq.com](https://console.groq.com) | `GROQ_API_KEY` | ~30 req/min |
-| OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) | `OPENROUTER_API_KEY` | 50/day |
+- The key lives **only in that visitor's browser session** — never written to disk, logged, or sent anywhere except OpenAI. It's validated with a zero-cost check when entered.
+- Users get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) and can pick a model in the UI (default `gpt-4o-mini`).
+- Embeddings still run **locally and free** (`sentence-transformers`) — the user's key is only for the LLM.
 
-Copy `.env.example` to `.env` and paste in whichever keys you have:
-```bash
-cp .env.example .env
-```
-
-**Free-tier limits to know about:** each provider has its own per-minute cap (roughly 30–60 req/min), and one shared key serves *all* visitors of a deployed app — the failover across the providers is what keeps it resilient under load. Each question burns 2–5 LLM calls (relevance check, research, verification, and up to one retry). Default models are fast, non-reasoning instruct models (`config/settings.py`); avoid "reasoning" models (they return empty content on small token budgets).
+So `.env` is optional (only for local model/OCR overrides), and there are **no deployment secrets to set**.
 
 ### 5. Run it
 ```bash
@@ -95,13 +87,7 @@ Opens at `http://localhost:8501`.
 1. Push this repo to your own GitHub account (public or private).
 2. Go to [share.streamlit.io](https://share.streamlit.io), sign in with GitHub, and click **New app**.
 3. Pick this repo/branch, set **Main file path** to `app.py`.
-4. In **Advanced settings → Secrets**, add at least one provider key (more = more resilient under load):
-   ```
-   CEREBRAS_API_KEY = "your-cerebras-key"
-   NVIDIA_API_KEY = "your-nvidia-key"
-   GROQ_API_KEY = "your-groq-key"
-   OPENROUTER_API_KEY = "your-openrouter-key"
-   ```
+4. **No secrets to set** — Verishelf is bring-your-own-key, so each visitor enters their own OpenAI key in the app.
 5. Deploy — first build takes a few minutes (Docling + PyTorch + the embedding model download).
 
 **Resource notes for the free tier (~1 GB RAM, shared vCPU):**
