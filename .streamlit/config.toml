@@ -1,0 +1,23 @@
+[theme]
+base = "light"
+primaryColor = "#1E3A56"
+backgroundColor = "#F8F5F0"
+secondaryBackgroundColor = "#F1ECE4"
+textColor = "#18110C"
+linkColor = "#1E3A56"
+borderColor = "#CCC6BF"
+codeBackgroundColor = "#F1ECE4"
+codeTextColor = "#18110C"
+font = "Newsreader:https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap"
+headingFont = "Newsreader"
+codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+baseRadius = "small"
+buttonRadius = "small"
+showWidgetBorder = true
+showSidebarBorder = true
+
+[server]
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false

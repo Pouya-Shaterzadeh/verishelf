@@ -1,0 +1,24 @@
+# CPU-only torch build - saves ~4GB vs the default CUDA wheels, which matters on
+# free hosting tiers (Hugging Face Spaces free CPU tier, Render free, etc). Harmless
+# if you run this locally with a GPU too - docling/embeddings still work fine on CPU.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Versions pinned deliberately: the langchain/langgraph ecosystem has broken import
+# paths across minor versions more than once (e.g. EnsembleRetriever moving from
+# langchain.retrievers to langchain_classic.retrievers) - float these at your own risk.
+torch==2.13.0+cpu
+streamlit==1.59.2
+docling==2.113.0
+langgraph==1.2.9
+langchain==1.3.14
+langchain-classic==1.0.8
+langchain-community==0.4.2
+langchain-text-splitters==1.1.2
+langchain-huggingface==1.2.2
+sentence-transformers==5.6.0
+chromadb==1.5.9
+rank-bm25==0.2.2
+openai==2.46.0
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
+loguru==0.7.3
