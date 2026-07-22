@@ -9,6 +9,7 @@ import os
 import re
 import tempfile
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -41,9 +42,11 @@ st.set_page_config(
 # wrapped so a missing key produces a friendly message instead of a raw traceback.
 try:
     from config import constants
+    from config.settings import settings
     from document_processor.file_handler import DocumentProcessor
     from retriever.builder import RetrieverBuilder
     from agents.workflow import AgentWorkflow
+    from agents.llm_client import probe_provider
     from openai import RateLimitError, APIError
 except Exception as exc:
     # Two distinct failure modes land here and shouldn't be conflated: no LLM provider
@@ -100,6 +103,25 @@ def get_retriever_builder() -> RetrieverBuilder:
 @st.cache_resource(show_spinner=False)
 def get_workflow() -> AgentWorkflow:
     return AgentWorkflow()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_provider_status() -> dict:
+    """Live availability per provider, refreshed at most once a minute (st.cache_data
+    is shared across all sessions, so this is ~3 probe calls/min total regardless of
+    traffic). 'unset' = no key; 'online'/'offline' = a 1-token probe succeeded/failed
+    (offline covers a bad key, an outage, or being rate-limited right now)."""
+    providers = settings.all_providers()
+    status = {p["name"]: "unset" for p in providers if not p["api_key"]}
+    keyed = [p for p in providers if p["api_key"]]
+    with ThreadPoolExecutor(max_workers=max(1, len(keyed))) as ex:
+        futures = {
+            ex.submit(probe_provider, p["base_url"], p["api_key"], p["model"]): p
+            for p in keyed
+        }
+        for fut, p in futures.items():
+            status[p["name"]] = "online" if fut.result() else "offline"
+    return status
 
 
 # --------------------------------------------------------------------------
@@ -311,6 +333,20 @@ st.markdown(
     .vs-kv + .vs-kv { margin-top: 0.2rem; }
     .vs-kv dt { color: var(--text-soft); }
     .vs-kv dd { color: var(--text); margin: 0; text-align: right; }
+
+    /* Provider availability status (live probe, refreshed ~once/min) */
+    .vs-status { margin-top: 0.35rem; }
+    .vs-status__row {
+        display: flex; align-items: center; gap: 0.5rem;
+        font-size: 0.78rem; color: var(--text); padding: 0.12rem 0;
+    }
+    .vs-status__dot {
+        width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .vs-status__dot--online { background: var(--verified); box-shadow: 0 0 0 3px color-mix(in srgb, var(--verified) 18%, transparent); }
+    .vs-status__dot--offline { background: var(--flagged); box-shadow: 0 0 0 3px color-mix(in srgb, var(--flagged) 18%, transparent); }
+    .vs-status__dot--unset { background: var(--rule); }
+    .vs-status__note { margin-left: auto; font-size: 0.68rem; color: var(--text-soft); letter-spacing: 0.04em; }
 
     /* ---- Verification ledger + citations ---- */
     .vs-ledger-row {
@@ -657,12 +693,25 @@ with st.sidebar:
             st.session_state.pop(key, None)
         st.rerun()
 
+    # Live provider availability: a colored dot per provider (green online, red
+    # offline/rate-limited, grey no key). Cached ~1 min, shared across sessions.
+    _status = get_provider_status()
+    _status_note = {"online": "online", "offline": "unavailable", "unset": "no key"}
+    _status_rows = "".join(
+        f'<div class="vs-status__row">'
+        f'<span class="vs-status__dot vs-status__dot--{_status.get(p["name"], "unset")}"></span>'
+        f'{p["label"]}'
+        f'<span class="vs-status__note">{_status_note[_status.get(p["name"], "unset")]}</span>'
+        f'</div>'
+        for p in settings.all_providers()
+    )
     st.markdown(
         f"""
         <dl class="vs-meta" style="margin-top: 1.4rem;">
             <div class="vs-kv"><dt>Retriever</dt><dd>bm25 &oplus; chroma</dd></div>
-            <div class="vs-kv"><dt>LLM</dt><dd>Nvidia &middot; Groq &middot; OpenRouter</dd></div>
         </dl>
+        <div class="vs-eyebrow">LLM providers</div>
+        <div class="vs-status">{_status_rows}</div>
         """,
         unsafe_allow_html=True,
     )

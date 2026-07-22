@@ -54,6 +54,19 @@ class Settings(BaseSettings):
                 active.append({"name": name, "base_url": base, "api_key": key, "model": model})
         return active
 
+    def all_providers(self) -> list:
+        """All three providers (with display label), regardless of whether a key is
+        set - for the status UI. active_providers() is the subset actually used."""
+        rows = [
+            ("nvidia", "Nvidia", self.NVIDIA_BASE_URL, self.NVIDIA_API_KEY, self.NVIDIA_MODEL),
+            ("groq", "Groq", self.GROQ_BASE_URL, self.GROQ_API_KEY, self.GROQ_MODEL),
+            ("openrouter", "OpenRouter", self.OPENROUTER_BASE_URL, self.OPENROUTER_API_KEY, self.OPENROUTER_MODEL),
+        ]
+        return [
+            {"name": n, "label": lbl, "base_url": b, "api_key": k, "model": m}
+            for (n, lbl, b, k, m) in rows
+        ]
+
     # Embeddings run locally (free, no API key needed)
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 

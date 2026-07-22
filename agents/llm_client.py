@@ -62,3 +62,25 @@ class MultiProviderLLM:
 def get_client() -> MultiProviderLLM:
     """Shared multi-provider LLM client (see MultiProviderLLM)."""
     return MultiProviderLLM(settings.active_providers())
+
+
+def probe_provider(base_url: str, api_key: str, model: str, timeout: float = 12.0) -> bool:
+    """Liveness check for one provider: a 1-token chat completion. Returns True iff the
+    provider answers right now - i.e. key valid, reachable, and not rate-limited. Uses
+    the same call path as real usage (NVIDIA's /models endpoint is public and wouldn't
+    catch a bad key or a rate limit, so a real completion is the only honest signal).
+    max_retries=0 so a down provider is reported promptly rather than retried."""
+    if not api_key:
+        return False
+    try:
+        client = OpenAI(base_url=base_url, api_key=api_key, max_retries=0, timeout=timeout)
+        client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+            temperature=0,
+        )
+        return True
+    except Exception as e:
+        logger.info(f"Provider probe failed for {base_url}: {type(e).__name__}")
+        return False
