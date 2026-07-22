@@ -37,11 +37,13 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "llama-3.1-8b-instant"
     OPENROUTER_MODEL: str = "google/gemma-4-26b-a4b-it:free"
 
-    # Failover order, most-generous first so the primary absorbs the most load before
-    # failing over: Gemini (~60 rpm) -> Cerebras (1M tokens/day, very fast) -> NVIDIA
-    # (no daily cap) -> Groq (fast but low token/min cap) -> OpenRouter (50/day, last
-    # resort). Reorder via .env to reprioritize.
-    PROVIDER_ORDER: list = ["gemini", "cerebras", "nvidia", "groq", "openrouter"]
+    # Failover order (also drives the sidebar status list). Most-generous first so the
+    # primary absorbs the most load before failing over: Cerebras (1M tokens/day, very
+    # fast) -> NVIDIA (no daily cap) -> Groq (fast but low token/min cap) -> OpenRouter
+    # (50/day, last resort). Gemini is intentionally omitted by default: its free tier
+    # is limit:0 in many regions, and being first there wastes a failed hop on every
+    # call. Add "gemini" back here (and set GEMINI_API_KEY) if your region has it.
+    PROVIDER_ORDER: list = ["cerebras", "nvidia", "groq", "openrouter"]
 
     @model_validator(mode="after")
     def _require_a_provider(self):
