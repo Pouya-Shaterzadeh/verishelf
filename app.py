@@ -430,6 +430,10 @@ st.markdown(
         box-shadow: none !important;
     }
 
+    /* Hide the "Press Enter to apply" hint - it overlaps the password show/hide (eye)
+       icon, and the field commits on Enter OR blur anyway, so it's redundant. */
+    [data-testid="InputInstructions"] { display: none !important; }
+
     /* Keep the accessible focus ring for keyboard nav on buttons/links, but exclude the
        chat input and all form inputs - those get the smooth container focus handled
        above, so they never show the default black/accent double outline. */
