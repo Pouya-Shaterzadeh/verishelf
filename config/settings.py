@@ -28,7 +28,11 @@ class Settings(BaseSettings):
     # on the small max_tokens used here.) OpenRouter has no free Llama, so it uses the
     # free Gemma we validated there.
     GEMINI_MODEL: str = "gemini-2.0-flash"
-    CEREBRAS_MODEL: str = "llama3.1-8b"
+    # Cerebras' free model lineup varies by account; llama3.1-8b isn't universally
+    # available. gemma-4-31b is a current, non-reasoning instruct model confirmed to
+    # follow the relevance-label and verification formats. Override via .env if your
+    # account lists different models (GET https://api.cerebras.ai/v1/models).
+    CEREBRAS_MODEL: str = "gemma-4-31b"
     NVIDIA_MODEL: str = "meta/llama-3.1-8b-instruct"
     GROQ_MODEL: str = "llama-3.1-8b-instant"
     OPENROUTER_MODEL: str = "google/gemma-4-26b-a4b-it:free"
