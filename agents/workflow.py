@@ -83,10 +83,13 @@ class AgentWorkflow:
                 self.researcher.generate, state["question"], state["documents"]
             )
 
+        # Only the top few passages are needed to judge whether the question is in
+        # scope - sending all 20 balloons the prompt's input tokens (which count against
+        # per-minute token limits, especially Groq's), for no better scope decision.
         classification = self.relevance_checker.check(
             question=state["question"],
             documents=state["documents"],
-            k=20
+            k=6
         )
 
         # CAN_ANSWER and PARTIAL both proceed; only NO_MATCH stops here.

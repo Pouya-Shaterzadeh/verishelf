@@ -6,9 +6,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Chunks from MarkdownHeaderTextSplitter aren't size-capped (a "chunk" can be a whole
-# page), so an uncapped context can balloon the prompt and slow down free-tier model
-# calls a lot. This keeps the context generous but bounded.
-MAX_CONTEXT_CHARS = 6000
+# page), so an uncapped context can balloon the prompt. Bounded to keep prompts fast
+# and, importantly, to stay under providers' per-minute token limits (Groq's free tier
+# especially) so failover to a secondary provider actually works instead of instantly
+# tripping its token cap. ~4000 chars is still ample grounding for a focused answer.
+MAX_CONTEXT_CHARS = 4000
 
 
 class ResearchAgent:

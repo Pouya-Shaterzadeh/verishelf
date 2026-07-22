@@ -235,20 +235,10 @@ st.markdown(
         }
     }
 
-    /* Sidebar locked to its default scroll position on desktop, where the fixed
-       452px width gives the content enough room to fit without scrolling. On
-       mobile the sidebar becomes a full-width overlay drawer with much less
-       vertical room (short viewport), so the same lock would clip content
-       (uploader, sample list, footer) below the fold with no way to reach it -
-       scrolling stays enabled there. Targets both the stable data-testid and the
-       underlying scroll container's emotion "target" class (eelgd2m2 in this
-       pinned Streamlit version) as a fallback. */
-    @media (min-width: 641px) {
-        [data-testid="stSidebarUserContent"],
-        .eelgd2m2 {
-            overflow: hidden !important;
-        }
-    }
+    /* Sidebar scrolls normally. (An earlier build locked it to no-scroll, but the
+       content - How it works, uploader, sample dossier, and now the live LLM-provider
+       status - is taller than a typical viewport, so scrolling is needed to reach the
+       lower items instead of clipping them off-screen.) */
 
     [data-testid="stMainBlockContainer"] { max-width: 860px; padding-top: 2.5rem; }
 
@@ -606,8 +596,9 @@ def ask(question: str):
             re_researched = result.get("re_researched", False)
         except RateLimitError:
             answer = (
-                "All configured providers are rate-limited right now (each free tier has "
-                "its own per-minute cap). Wait a few seconds and try again."
+                "All providers are busy right now — every configured free tier hit its "
+                "per-minute limit at once. (The status dots reflect a check from up to a "
+                "minute ago, so they can lag a sudden spike.) Wait a few seconds and retry."
             )
             verification, citations, passages_consulted, re_researched = "", [], 0, False
         except APIError as e:

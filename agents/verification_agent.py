@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 # Keep in sync with research_agent.MAX_CONTEXT_CHARS - both agents see the same
 # retrieved documents, so their prompt sizes should be capped the same way.
-MAX_CONTEXT_CHARS = 6000
+MAX_CONTEXT_CHARS = 4000
 
 
 class VerificationAgent:
