@@ -237,10 +237,16 @@ st.markdown(
         }
     }
 
-    /* Sidebar scrolls normally. (An earlier build locked it to no-scroll, but the
-       content - How it works, uploader, sample dossier, and now the live LLM-provider
-       status - is taller than a typical viewport, so scrolling is needed to reach the
-       lower items instead of clipping them off-screen.) */
+    /* Pull the sidebar content up by trimming Streamlit's default header/top padding,
+       so "How it works" sits near the top. */
+    [data-testid="stSidebarHeader"] { padding: 0.3rem 0.5rem 0 !important; min-height: 0 !important; height: 2.2rem !important; }
+    [data-testid="stSidebarUserContent"] { padding-top: 0 !important; padding-bottom: 1rem !important; }
+
+    /* Hide the sidebar scrollbar but keep it scrollable. With the compacted spacing the
+       content fits without a bar on a normal-height screen; on a shorter one it can
+       still be scrolled (no visible bar, and nothing gets clipped off-screen). */
+    [data-testid="stSidebar"] *::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+    [data-testid="stSidebar"] * { scrollbar-width: none !important; }
 
     [data-testid="stMainBlockContainer"] { max-width: 860px; padding-top: 2.5rem; }
 
@@ -304,19 +310,19 @@ st.markdown(
         font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase;
         color: var(--text-soft); margin: 1.2rem 0 0.5rem; font-weight: 600;
     }
-    .vs-eyebrow--lead { margin-top: 0.4rem; font-size: 0.8rem; }
-    .vs-howitworks { list-style: none; margin: 0 0 1.5rem; padding: 0; }
+    .vs-eyebrow--lead { margin-top: 0; font-size: 0.8rem; }
+    .vs-howitworks { list-style: none; margin: 0 0 0.9rem; padding: 0; }
     .vs-howitworks li {
         display: grid; grid-template-columns: 2rem 1fr; gap: 0.4rem;
-        margin-bottom: 0.85rem;
+        margin-bottom: 0.5rem;
     }
     .vs-howitworks .vs-num {
         font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; letter-spacing: 0.08em;
-        color: var(--accent); padding-top: 0.15rem;
+        color: var(--accent); padding-top: 0.1rem;
     }
     .vs-howitworks span:last-child {
-        font-family: 'Newsreader', serif; font-style: italic; font-size: 1.02rem;
-        color: var(--text-soft); line-height: 1.55;
+        font-family: 'Newsreader', serif; font-style: italic; font-size: 0.98rem;
+        color: var(--text-soft); line-height: 1.4;
     }
     .vs-meta { font-size: 0.74rem; color: var(--text-soft); line-height: 1.6; }
     .vs-meta strong { color: var(--text); }
