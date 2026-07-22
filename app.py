@@ -46,7 +46,7 @@ try:
     from document_processor.file_handler import DocumentProcessor
     from retriever.builder import RetrieverBuilder
     from agents.workflow import AgentWorkflow
-    from agents.llm_client import make_client, validate_key
+    from agents.llm_client import make_client, validate_key, pick_default_model
     from openai import RateLimitError, APIError
 except Exception as exc:
     st.error("Startup error")
@@ -107,6 +107,7 @@ defaults = {
     "api_key": "",
     "key_ok": False,
     "key_msg": "",
+    "models": [],  # discovered from the user's key at runtime
     "model": settings.OPENAI_MODEL,
 }
 for key, value in defaults.items():
@@ -602,25 +603,37 @@ with st.sidebar:
         label_visibility="collapsed", key="api_key_input",
         help="Used only in your browser session — never stored, logged, or sent anywhere except OpenAI.",
     )
-    # Validate once per distinct entry (models.list costs no tokens). Store the attempt
-    # so an invalid key doesn't re-trigger validation on every rerun.
+    # Validate once per distinct entry (models.list costs no tokens). The same call
+    # discovers the models this key can use. Store the attempt so an invalid key doesn't
+    # re-trigger validation on every rerun.
     if _key_in != st.session_state.api_key:
         st.session_state.api_key = _key_in
         if _key_in:
             with st.spinner("Verifying key…"):
-                st.session_state.key_ok, st.session_state.key_msg = validate_key(_key_in)
+                ok, msg, models = validate_key(_key_in)
+            st.session_state.key_ok, st.session_state.key_msg, st.session_state.models = ok, msg, models
+            # Auto-pick a sensible default from the user's own models, unless their
+            # current choice is still available.
+            if ok and models and st.session_state.model not in models:
+                st.session_state.model = pick_default_model(models)
         else:
-            st.session_state.key_ok, st.session_state.key_msg = False, ""
+            st.session_state.key_ok, st.session_state.key_msg, st.session_state.models = False, "", []
 
     if st.session_state.key_ok:
         st.markdown('<div class="vs-key vs-key--ok">✓ Key active</div>', unsafe_allow_html=True)
-        st.session_state.model = st.selectbox(
-            "Model", settings.OPENAI_MODELS,
-            index=settings.OPENAI_MODELS.index(st.session_state.model)
-            if st.session_state.model in settings.OPENAI_MODELS else 0,
-            label_visibility="collapsed",
-            help="gpt-4o-mini is the cheapest and plenty capable for this.",
-        )
+        if st.session_state.models:
+            _models = st.session_state.models
+            _idx = _models.index(st.session_state.model) if st.session_state.model in _models else 0
+            st.session_state.model = st.selectbox(
+                "Model", _models, index=_idx, label_visibility="collapsed",
+                help="Models your key can access. A cost-efficient one is picked by default.",
+            )
+        else:
+            # Key valid but the models list came back empty - let them type a model ID.
+            st.session_state.model = st.text_input(
+                "Model", value=st.session_state.model or "gpt-4o-mini",
+                label_visibility="collapsed", help="Type a chat model ID your key can use.",
+            )
     elif st.session_state.key_msg:
         st.markdown(f'<div class="vs-key vs-key--bad">✕ {html.escape(st.session_state.key_msg)}</div>', unsafe_allow_html=True)
     st.markdown(
@@ -691,7 +704,7 @@ with st.sidebar:
         st.session_state.uploader_nonce += 1
         # Reset the documents/conversation but KEEP the visitor's key + model so they
         # don't have to re-enter it for every new dossier.
-        _keep = {"api_key", "key_ok", "key_msg", "model"}
+        _keep = {"api_key", "key_ok", "key_msg", "models", "model"}
         for key in defaults:
             if key not in _keep:
                 st.session_state.pop(key, None)

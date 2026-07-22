@@ -9,10 +9,11 @@ class Settings(BaseSettings):
     # OPENAI_BASE_URL is overridable for OpenAI-compatible providers, but the app is
     # designed around OpenAI keys.
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
-    # Cost-effective, fast, strong at the strict relevance-label / verification formats
-    # these prompts need. Users can pick a model in the UI (see OPENAI_MODELS).
+    # The actual model list is discovered dynamically from the user's own key at runtime
+    # (see agents.llm_client.validate_key), so there's no hardcoded list to go stale.
+    # This is only a placeholder shown before a key is entered / a fallback if the models
+    # call ever fails.
     OPENAI_MODEL: str = "gpt-4o-mini"
-    OPENAI_MODELS: list = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
 
     # Embeddings run locally (free, no API key needed - the user's key is only for the LLM)
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
