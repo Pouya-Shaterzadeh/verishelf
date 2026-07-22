@@ -9,7 +9,7 @@ class RelevanceChecker:
     def __init__(self):
         self.client = get_client()
         self.model = settings.RELEVANCE_MODEL
-        logger.info(f"RelevanceChecker using model '{self.model}' via OpenRouter.")
+        logger.info(f"RelevanceChecker using model '{self.model}' via NVIDIA NIM.")
 
     def check(self, question: str, documents, k=3) -> str:
         """

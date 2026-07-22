@@ -3,25 +3,26 @@ from .constants import MAX_FILE_SIZE, MAX_TOTAL_SIZE, ALLOWED_TYPES
 
 class Settings(BaseSettings):
     # Required settings
-    OPENROUTER_API_KEY: str
+    LLM_API_KEY: str
 
-    # OpenRouter connection
-    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    # Optional attribution headers OpenRouter uses for its public rankings - safe to leave as-is.
-    OPENROUTER_SITE_URL: str = "https://github.com"
-    OPENROUTER_SITE_NAME: str = "Verishelf"
+    # LLM provider connection. Provider-neutral names (LLM_*) because we've swapped
+    # providers before - any OpenAI-compatible endpoint works by overriding these two
+    # in .env. Default is NVIDIA's build.nvidia.com (NIM) hosted catalog: free for
+    # development with a ~40 requests/minute rate limit and, crucially, NO daily quota
+    # (the OpenRouter free tier's 50/day cap was the recurring "rate limit" failure).
+    LLM_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
 
-    # Model routing - defaults are free-tier models on OpenRouter.
-    # Deliberately NOT a "reasoning" model (e.g. the nvidia/nemotron-*:free or
-    # openai/gpt-oss-*:free families): those burn the whole max_tokens budget on
-    # hidden chain-of-thought before ever emitting the actual answer, which comes
-    # back as content=None on the small token budgets these prompts use.
-    # Free models rotate over time; check https://openrouter.ai/models?max_price=0
-    # and override via .env if this gets deprecated - verify a candidate isn't a
-    # reasoning model first (check for a populated `reasoning` field with content=None).
-    RESEARCH_MODEL: str = "google/gemma-4-26b-a4b-it:free"
-    VERIFICATION_MODEL: str = "google/gemma-4-26b-a4b-it:free"
-    RELEVANCE_MODEL: str = "google/gemma-4-26b-a4b-it:free"
+    # Model routing. meta/llama-3.1-8b-instruct: a plain instruct model (NOT a
+    # "reasoning" model - those spend the token budget on hidden chain-of-thought and
+    # return empty content on the small max_tokens these prompts use). Chosen for
+    # SPEED: on NVIDIA's free tier the big 70B model is heavily queued (~15-25s to
+    # first byte), while the 8B answers in well under a second and still follows the
+    # strict relevance-label and verification formats cleanly. Browse the catalog at
+    # https://build.nvidia.com/models and override any of these via .env - just avoid
+    # reasoning models. For higher quality at the cost of latency, meta/llama-3.3-70b-instruct.
+    RESEARCH_MODEL: str = "meta/llama-3.1-8b-instruct"
+    VERIFICATION_MODEL: str = "meta/llama-3.1-8b-instruct"
+    RELEVANCE_MODEL: str = "meta/llama-3.1-8b-instruct"
 
     # Embeddings run locally (free, no API key needed)
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -56,5 +57,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        # Ignore unrecognized env vars (e.g. a leftover key from a previous provider)
+        # instead of crashing on them - only the fields declared above are consumed.
+        extra = "ignore"
 
 settings = Settings()

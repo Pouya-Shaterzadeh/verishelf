@@ -14,11 +14,11 @@ MAX_CONTEXT_CHARS = 6000
 class VerificationAgent:
     def __init__(self):
         """
-        Initialize the verification agent with an OpenRouter-backed chat model.
+        Initialize the verification agent with an NVIDIA NIM-backed chat model.
         """
         self.client = get_client()
         self.model = settings.VERIFICATION_MODEL
-        logger.info(f"VerificationAgent using model '{self.model}' via OpenRouter.")
+        logger.info(f"VerificationAgent using model '{self.model}' via NVIDIA NIM.")
 
     def sanitize_response(self, response_text: str) -> str:
         """

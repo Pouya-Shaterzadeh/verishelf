@@ -37,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Imports that touch config.settings (and therefore require OPENROUTER_API_KEY) are
+# Imports that touch config.settings (and therefore require LLM_API_KEY) are
 # wrapped so a missing key produces a friendly message instead of a raw traceback.
 try:
     from config import constants
@@ -47,15 +47,15 @@ try:
     from openai import RateLimitError, APIError
 except Exception as exc:
     # Two distinct failure modes land here and shouldn't be conflated: a missing/blank
-    # OPENROUTER_API_KEY (pydantic ValidationError, mentions the field by name) versus
+    # LLM_API_KEY (pydantic ValidationError, mentions the field by name) versus
     # any other import-time failure (e.g. a missing system library a dependency needs).
     # Only show the API-key remediation steps when the exception actually names it.
-    if "OPENROUTER_API_KEY" in str(exc):
+    if "LLM_API_KEY" in str(exc):
         st.error("Configuration error")
         st.markdown(
-            "Verishelf can't start because **`OPENROUTER_API_KEY`** isn't set.\n\n"
+            "Verishelf can't start because **`LLM_API_KEY`** isn't set.\n\n"
             "1. Copy `.env.example` to `.env`\n"
-            "2. Add your key from [openrouter.ai/keys](https://openrouter.ai/keys) (free to create)\n"
+            "2. Add your key from [build.nvidia.com](https://build.nvidia.com) (free to create)\n"
             "3. Restart the app"
         )
     else:
@@ -567,9 +567,8 @@ def ask(question: str):
             re_researched = result.get("re_researched", False)
         except RateLimitError:
             answer = (
-                "OpenRouter's free-tier rate limit was hit (20 requests/minute, 50/day "
-                "without added credit). Wait a bit and try again, or add $10 of OpenRouter "
-                "credit to raise the daily cap to 1000."
+                "The provider's free-tier rate limit was hit (about 40 requests/minute "
+                "on NVIDIA's build.nvidia.com). Wait a few seconds and try again."
             )
             verification, citations, passages_consulted, re_researched = "", [], 0, False
         except APIError as e:
@@ -659,7 +658,7 @@ with st.sidebar:
         f"""
         <dl class="vs-meta" style="margin-top: 1.4rem;">
             <div class="vs-kv"><dt>Retriever</dt><dd>bm25 &oplus; chroma</dd></div>
-            <div class="vs-kv"><dt>Rate</dt><dd>20/min &middot; 50/day</dd></div>
+            <div class="vs-kv"><dt>Rate</dt><dd>~40 req/min</dd></div>
         </dl>
         """,
         unsafe_allow_html=True,
@@ -704,7 +703,7 @@ for i, msg in enumerate(st.session_state.messages):
 if st.session_state.retriever:
     st.markdown(
         '<div class="vs-kv" style="max-width: 860px; margin: 0 auto;">'
-        '<dt>Answers are drafted from your corpus only.</dt><dd>20 req/min &middot; 50/day</dd>'
+        '<dt>Answers are drafted from your corpus only.</dt><dd>~40 req/min</dd>'
         "</div>",
         unsafe_allow_html=True,
     )

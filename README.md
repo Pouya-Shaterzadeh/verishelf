@@ -21,7 +21,7 @@ This project started from the IBM Skills Network "DocChat" hands-on lab and keep
 
 | Layer | Lab version | This project |
 |---|---|---|
-| LLMs | IBM watsonx.ai, sandbox-only `project_id="skills-network"` | [OpenRouter](https://openrouter.ai) free-tier models, your own API key |
+| LLMs | IBM watsonx.ai, sandbox-only `project_id="skills-network"` | [NVIDIA build.nvidia.com](https://build.nvidia.com) free-tier models (`meta/llama-3.1-8b-instruct`), your own API key |
 | Embeddings | IBM watsonx embeddings (needs the same sandbox) | Local `sentence-transformers` model — free, no key, runs on CPU |
 | Frontend | Gradio | Streamlit, custom-designed |
 
@@ -56,15 +56,15 @@ pip install -r requirements.txt
 ```
 This pulls in Docling + PyTorch (CPU build) + a local embedding model, so the first install can take a few minutes and a few GB of disk.
 
-### 4. Get a free OpenRouter API key
-Verishelf calls the LLM through [OpenRouter](https://openrouter.ai), which fronts many providers' **free-tier models** behind one key.
-1. Sign up at [openrouter.ai](https://openrouter.ai) and create a key at [openrouter.ai/keys](https://openrouter.ai/keys).
-2. Copy `.env.example` to `.env` and paste your key in:
+### 4. Get a free NVIDIA API key
+Verishelf calls the LLM through [NVIDIA's build.nvidia.com](https://build.nvidia.com) (NIM), an OpenAI-compatible endpoint that hosts 100+ open models behind one key.
+1. Sign up for a free NVIDIA Developer account at [build.nvidia.com](https://build.nvidia.com) (no credit card) and generate an API key.
+2. Copy `.env.example` to `.env` and paste your key in as `LLM_API_KEY`:
    ```bash
    cp .env.example .env
    ```
 
-**Free-tier limits to know about:** OpenRouter's `:free` models cap out at **20 requests/minute** and **50 requests/day** per key — rising to **1000/day** the moment you've ever added $10 of credit (a one-time thing, it doesn't expire). Each question burns 2–5 LLM calls (relevance check, research, verification, and up to one retry), so the free 50/day is roughly 10–20 questions/day. The default models (`config/settings.py`) can be overridden via `.env` if OpenRouter deprecates one — check [openrouter.ai/models?max_price=0](https://openrouter.ai/models?max_price=0) for the current free catalog.
+**Free-tier limits to know about:** the developer tier is rate-limited to about **40 requests/minute** with **no daily quota**. Each question burns 2–5 LLM calls (relevance check, research, verification, and up to one retry). The default model is `meta/llama-3.1-8b-instruct`, chosen for speed (NVIDIA's larger models are heavily queued on the free tier). Any model role in `config/settings.py` can be overridden via `.env` — browse the catalog at [build.nvidia.com/models](https://build.nvidia.com/models), and avoid "reasoning" models (they return empty content on small token budgets). Because it's OpenAI-compatible, you can point `LLM_BASE_URL` at any other provider too.
 
 ### 5. Run it
 ```bash
@@ -90,7 +90,7 @@ Opens at `http://localhost:8501`.
 3. Pick this repo/branch, set **Main file path** to `app.py`.
 4. In **Advanced settings → Secrets**, add:
    ```
-   OPENROUTER_API_KEY = "your-key-here"
+   LLM_API_KEY = "your-key-here"
    ```
 5. Deploy — first build takes a few minutes (Docling + PyTorch + the embedding model download).
 

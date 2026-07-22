@@ -15,11 +15,11 @@ MAX_CONTEXT_CHARS = 6000
 class ResearchAgent:
     def __init__(self):
         """
-        Initialize the research agent with an OpenRouter-backed chat model.
+        Initialize the research agent with an NVIDIA NIM-backed chat model.
         """
         self.client = get_client()
         self.model = settings.RESEARCH_MODEL
-        logger.info(f"ResearchAgent using model '{self.model}' via OpenRouter.")
+        logger.info(f"ResearchAgent using model '{self.model}' via NVIDIA NIM.")
 
     def sanitize_response(self, response_text: str) -> str:
         """
