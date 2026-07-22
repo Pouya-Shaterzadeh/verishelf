@@ -406,27 +406,34 @@ st.markdown(
         outline: none !important;
     }
 
-    /* Selectbox (baseweb combobox) paints the same hardcoded focus border/box-shadow.
-       Pin its wrapper to the neutral rule color in every state so opening the sample
-       dropdown produces no border-color change. */
-    div[data-baseweb="select"] > div,
-    div[data-baseweb="select"] > div:focus-within,
-    div:has(> div > input[role="combobox"]),
-    div:has(> div > input[role="combobox"]):focus-within {
-        border-color: var(--rule) !important;
-        box-shadow: none !important;
+    /* Text inputs (the OpenAI key field) and the selectbox/combobox use Streamlit's
+       newer emotion/react-aria structure (no longer data-baseweb), whose default focus
+       state paints a harsh dark border. Replace it with a smooth, rounded accent focus:
+       a soft border + gentle glow, never a black ring. Targeted by stable testid/role. */
+    [data-testid="stTextInputRootElement"],
+    div[role="group"]:has(> input[role="combobox"]) {
+        border-radius: 7px !important;
+        transition: border-color 130ms ease, box-shadow 130ms ease;
+    }
+    [data-testid="stTextInputRootElement"]:focus-within,
+    div[role="group"]:has(> input[role="combobox"]):focus-within {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent) !important;
         outline: none !important;
     }
+    /* The inner <input> must not add its own outline/ring on top of the container's. */
+    [data-testid="stTextInputRootElement"] input:focus,
+    [data-testid="stTextInputRootElement"] input:focus-visible,
     input[role="combobox"]:focus,
     input[role="combobox"]:focus-visible {
-        box-shadow: none !important;
         outline: none !important;
+        box-shadow: none !important;
     }
 
-    /* Keep the accessible focus ring for real keyboard navigation elsewhere, but
-       exclude the chat input and the combobox (both handled above) so they stay
-       borderless on click. */
-    *:focus-visible:not([data-testid="stChatInputTextArea"]):not(input[role="combobox"]) { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
+    /* Keep the accessible focus ring for keyboard nav on buttons/links, but exclude the
+       chat input and all form inputs - those get the smooth container focus handled
+       above, so they never show the default black/accent double outline. */
+    *:focus-visible:not([data-testid="stChatInputTextArea"]):not(input):not(textarea) { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
     </style>
     """,
     unsafe_allow_html=True,
