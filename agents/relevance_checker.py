@@ -1,4 +1,3 @@
-from config.settings import settings
 from .llm_client import get_client
 import logging
 
@@ -7,9 +6,7 @@ logger = logging.getLogger(__name__)
 
 class RelevanceChecker:
     def __init__(self):
-        self.client = get_client()
-        self.model = settings.RELEVANCE_MODEL
-        logger.info(f"RelevanceChecker using model '{self.model}' via NVIDIA NIM.")
+        self.client = get_client()  # multi-provider failover client
 
     def check(self, question: str, documents, k=3) -> str:
         """
@@ -53,12 +50,11 @@ class RelevanceChecker:
         **Respond ONLY with one of the following labels: CAN_ANSWER, PARTIAL, NO_MATCH**
         """
 
-        # Call the LLM. Note: API/network/auth errors are intentionally NOT caught here -
-        # they must propagate up so the UI can tell "the model said no" apart from
-        # "the model call failed" instead of misreporting a broken key as an
-        # out-of-scope question.
-        response = self.client.chat.completions.create(
-            model=self.model,
+        # Call the LLM (with cross-provider failover). Note: API/network/auth errors
+        # are intentionally NOT caught here - only after every provider has failed does
+        # the error propagate, so the UI can tell "the model said no" apart from "all
+        # providers failed" instead of misreporting a real failure as out-of-scope.
+        response = self.client.create(
             messages=[{"role": "user", "content": prompt}],
             max_tokens=10,
             temperature=0.0,

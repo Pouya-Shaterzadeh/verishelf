@@ -37,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Imports that touch config.settings (and therefore require LLM_API_KEY) are
+# Imports that touch config.settings (and therefore require an LLM provider key) are
 # wrapped so a missing key produces a friendly message instead of a raw traceback.
 try:
     from config import constants
@@ -46,16 +46,19 @@ try:
     from agents.workflow import AgentWorkflow
     from openai import RateLimitError, APIError
 except Exception as exc:
-    # Two distinct failure modes land here and shouldn't be conflated: a missing/blank
-    # LLM_API_KEY (pydantic ValidationError, mentions the field by name) versus
-    # any other import-time failure (e.g. a missing system library a dependency needs).
-    # Only show the API-key remediation steps when the exception actually names it.
-    if "LLM_API_KEY" in str(exc):
+    # Two distinct failure modes land here and shouldn't be conflated: no LLM provider
+    # key configured (the validator names the three keys) versus any other import-time
+    # failure (e.g. a missing system library). Only show the key-setup steps when the
+    # exception actually names a provider key.
+    _key_names = ("NVIDIA_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY")
+    if any(k in str(exc) for k in _key_names):
         st.error("Configuration error")
         st.markdown(
-            "Verishelf can't start because **`LLM_API_KEY`** isn't set.\n\n"
+            "Verishelf can't start because no **LLM provider key** is set.\n\n"
             "1. Copy `.env.example` to `.env`\n"
-            "2. Add your key from [build.nvidia.com](https://build.nvidia.com) (free to create)\n"
+            "2. Add at least one free key — `NVIDIA_API_KEY` ([build.nvidia.com](https://build.nvidia.com)), "
+            "`GROQ_API_KEY` ([console.groq.com](https://console.groq.com)), or "
+            "`OPENROUTER_API_KEY` ([openrouter.ai/keys](https://openrouter.ai/keys))\n"
             "3. Restart the app"
         )
     else:
@@ -567,8 +570,8 @@ def ask(question: str):
             re_researched = result.get("re_researched", False)
         except RateLimitError:
             answer = (
-                "The provider's free-tier rate limit was hit (about 40 requests/minute "
-                "on NVIDIA's build.nvidia.com). Wait a few seconds and try again."
+                "All configured providers are rate-limited right now (each free tier has "
+                "its own per-minute cap). Wait a few seconds and try again."
             )
             verification, citations, passages_consulted, re_researched = "", [], 0, False
         except APIError as e:
@@ -658,7 +661,7 @@ with st.sidebar:
         f"""
         <dl class="vs-meta" style="margin-top: 1.4rem;">
             <div class="vs-kv"><dt>Retriever</dt><dd>bm25 &oplus; chroma</dd></div>
-            <div class="vs-kv"><dt>Rate</dt><dd>~40 req/min</dd></div>
+            <div class="vs-kv"><dt>LLM</dt><dd>Nvidia &middot; Groq &middot; OpenRouter</dd></div>
         </dl>
         """,
         unsafe_allow_html=True,
@@ -703,7 +706,7 @@ for i, msg in enumerate(st.session_state.messages):
 if st.session_state.retriever:
     st.markdown(
         '<div class="vs-kv" style="max-width: 860px; margin: 0 auto;">'
-        '<dt>Answers are drafted from your corpus only.</dt><dd>~40 req/min</dd>'
+        '<dt>Answers are drafted from your corpus only.</dt><dd>nvidia &middot; groq &middot; openrouter</dd>'
         "</div>",
         unsafe_allow_html=True,
     )

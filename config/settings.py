@@ -1,28 +1,58 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from .constants import MAX_FILE_SIZE, MAX_TOTAL_SIZE, ALLOWED_TYPES
 
 class Settings(BaseSettings):
-    # Required settings
-    LLM_API_KEY: str
+    # --- LLM providers (multi-provider fallback) ---
+    # Each LLM call is tried against the configured providers in PROVIDER_ORDER until
+    # one succeeds, so a rate limit / timeout / outage on one silently fails over to
+    # the next. A provider is "active" only if its API key is set; at least one is
+    # required (enforced below). All are OpenAI-compatible, so the client is uniform -
+    # only the base URL and model ID differ per provider.
+    NVIDIA_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
 
-    # LLM provider connection. Provider-neutral names (LLM_*) because we've swapped
-    # providers before - any OpenAI-compatible endpoint works by overriding these two
-    # in .env. Default is NVIDIA's build.nvidia.com (NIM) hosted catalog: free for
-    # development with a ~40 requests/minute rate limit and, crucially, NO daily quota
-    # (the OpenRouter free tier's 50/day cap was the recurring "rate limit" failure).
-    LLM_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
-    # Model routing. meta/llama-3.1-8b-instruct: a plain instruct model (NOT a
-    # "reasoning" model - those spend the token budget on hidden chain-of-thought and
-    # return empty content on the small max_tokens these prompts use). Chosen for
-    # SPEED: on NVIDIA's free tier the big 70B model is heavily queued (~15-25s to
-    # first byte), while the 8B answers in well under a second and still follows the
-    # strict relevance-label and verification formats cleanly. Browse the catalog at
-    # https://build.nvidia.com/models and override any of these via .env - just avoid
-    # reasoning models. For higher quality at the cost of latency, meta/llama-3.3-70b-instruct.
-    RESEARCH_MODEL: str = "meta/llama-3.1-8b-instruct"
-    VERIFICATION_MODEL: str = "meta/llama-3.1-8b-instruct"
-    RELEVANCE_MODEL: str = "meta/llama-3.1-8b-instruct"
+    # One model per provider (the same request, but each provider names models
+    # differently). All are fast, non-reasoning instruct models validated to follow
+    # the strict relevance-label / verification formats these prompts need. (Reasoning
+    # models spend the token budget on hidden chain-of-thought and return empty content
+    # on the small max_tokens used here.) OpenRouter has no free Llama, so it uses the
+    # free Gemma we validated there.
+    NVIDIA_MODEL: str = "meta/llama-3.1-8b-instruct"
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    OPENROUTER_MODEL: str = "google/gemma-4-26b-a4b-it:free"
+
+    # Failover order. NVIDIA first (no daily cap), then Groq (very fast, ~30 rpm), then
+    # OpenRouter last (50/day free, most limited). Reorder via .env to reprioritize.
+    PROVIDER_ORDER: list = ["nvidia", "groq", "openrouter"]
+
+    @model_validator(mode="after")
+    def _require_a_provider(self):
+        if not self.active_providers():
+            raise ValueError(
+                "No LLM provider configured. Set at least one of NVIDIA_API_KEY, "
+                "GROQ_API_KEY, or OPENROUTER_API_KEY in .env."
+            )
+        return self
+
+    def active_providers(self) -> list:
+        """Configured providers in failover order - only those whose key is set."""
+        cfg = {
+            "nvidia": (self.NVIDIA_BASE_URL, self.NVIDIA_API_KEY, self.NVIDIA_MODEL),
+            "groq": (self.GROQ_BASE_URL, self.GROQ_API_KEY, self.GROQ_MODEL),
+            "openrouter": (self.OPENROUTER_BASE_URL, self.OPENROUTER_API_KEY, self.OPENROUTER_MODEL),
+        }
+        active = []
+        for name in self.PROVIDER_ORDER:
+            base, key, model = cfg.get(name, (None, "", None))
+            if key:
+                active.append({"name": name, "base_url": base, "api_key": key, "model": model})
+        return active
 
     # Embeddings run locally (free, no API key needed)
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"

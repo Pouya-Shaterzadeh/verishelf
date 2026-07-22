@@ -21,7 +21,7 @@ This project started from the IBM Skills Network "DocChat" hands-on lab and keep
 
 | Layer | Lab version | This project |
 |---|---|---|
-| LLMs | IBM watsonx.ai, sandbox-only `project_id="skills-network"` | [NVIDIA build.nvidia.com](https://build.nvidia.com) free-tier models (`meta/llama-3.1-8b-instruct`), your own API key |
+| LLMs | IBM watsonx.ai, sandbox-only `project_id="skills-network"` | Free-tier models with multi-provider failover (NVIDIA · Groq · OpenRouter), your own API keys |
 | Embeddings | IBM watsonx embeddings (needs the same sandbox) | Local `sentence-transformers` model — free, no key, runs on CPU |
 | Frontend | Gradio | Streamlit, custom-designed |
 
@@ -56,15 +56,21 @@ pip install -r requirements.txt
 ```
 This pulls in Docling + PyTorch (CPU build) + a local embedding model, so the first install can take a few minutes and a few GB of disk.
 
-### 4. Get a free NVIDIA API key
-Verishelf calls the LLM through [NVIDIA's build.nvidia.com](https://build.nvidia.com) (NIM), an OpenAI-compatible endpoint that hosts 100+ open models behind one key.
-1. Sign up for a free NVIDIA Developer account at [build.nvidia.com](https://build.nvidia.com) (no credit card) and generate an API key.
-2. Copy `.env.example` to `.env` and paste your key in as `LLM_API_KEY`:
-   ```bash
-   cp .env.example .env
-   ```
+### 4. Get free LLM API keys (one or more)
+Verishelf uses **multi-provider failover** across three free, OpenAI-compatible LLM providers — each LLM call is tried against them in order until one succeeds, so a rate limit or outage on one silently falls over to the next. Set **at least one** key; set all three for full resilience.
 
-**Free-tier limits to know about:** the developer tier is rate-limited to about **40 requests/minute** with **no daily quota**. Each question burns 2–5 LLM calls (relevance check, research, verification, and up to one retry). The default model is `meta/llama-3.1-8b-instruct`, chosen for speed (NVIDIA's larger models are heavily queued on the free tier). Any model role in `config/settings.py` can be overridden via `.env` — browse the catalog at [build.nvidia.com/models](https://build.nvidia.com/models), and avoid "reasoning" models (they return empty content on small token budgets). Because it's OpenAI-compatible, you can point `LLM_BASE_URL` at any other provider too.
+| Provider | Get a free key | Env var |
+|---|---|---|
+| NVIDIA (build.nvidia.com) | [build.nvidia.com](https://build.nvidia.com) | `NVIDIA_API_KEY` |
+| Groq | [console.groq.com](https://console.groq.com) | `GROQ_API_KEY` |
+| OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) | `OPENROUTER_API_KEY` |
+
+Copy `.env.example` to `.env` and paste in whichever keys you have:
+```bash
+cp .env.example .env
+```
+
+**Free-tier limits to know about:** each provider has its own per-minute cap (roughly 30–60 req/min), and one shared key serves *all* visitors of a deployed app — the failover across three providers is what keeps it resilient under load. Each question burns 2–5 LLM calls (relevance check, research, verification, and up to one retry). Default models are fast, non-reasoning instruct models (`config/settings.py`); avoid "reasoning" models (they return empty content on small token budgets).
 
 ### 5. Run it
 ```bash
@@ -88,9 +94,11 @@ Opens at `http://localhost:8501`.
 1. Push this repo to your own GitHub account (public or private).
 2. Go to [share.streamlit.io](https://share.streamlit.io), sign in with GitHub, and click **New app**.
 3. Pick this repo/branch, set **Main file path** to `app.py`.
-4. In **Advanced settings → Secrets**, add:
+4. In **Advanced settings → Secrets**, add at least one provider key (all three recommended):
    ```
-   LLM_API_KEY = "your-key-here"
+   NVIDIA_API_KEY = "your-nvidia-key"
+   GROQ_API_KEY = "your-groq-key"
+   OPENROUTER_API_KEY = "your-openrouter-key"
    ```
 5. Deploy — first build takes a few minutes (Docling + PyTorch + the embedding model download).
 

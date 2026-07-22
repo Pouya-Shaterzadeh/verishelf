@@ -1,6 +1,5 @@
 from typing import Dict, List
 from langchain_core.documents import Document
-from config.settings import settings
 from .llm_client import get_client
 import logging
 
@@ -17,9 +16,7 @@ class ResearchAgent:
         """
         Initialize the research agent with an NVIDIA NIM-backed chat model.
         """
-        self.client = get_client()
-        self.model = settings.RESEARCH_MODEL
-        logger.info(f"ResearchAgent using model '{self.model}' via NVIDIA NIM.")
+        self.client = get_client()  # multi-provider failover client
 
     def sanitize_response(self, response_text: str) -> str:
         """
@@ -60,11 +57,10 @@ class ResearchAgent:
         # Create a prompt for the LLM
         prompt = self.generate_prompt(question, context)
 
-        # Call the LLM to generate the answer. API/network/rate-limit errors are left
-        # to propagate so the UI can tell them apart (e.g. a specific rate-limit message)
-        # instead of collapsing everything into one generic failure.
-        response = self.client.chat.completions.create(
-            model=self.model,
+        # Call the LLM to generate the answer (with cross-provider failover). Errors
+        # propagate only after every provider fails, so the UI can show a specific
+        # rate-limit message instead of collapsing everything into one generic failure.
+        response = self.client.create(
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
             temperature=0.3,
