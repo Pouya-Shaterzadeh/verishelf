@@ -50,16 +50,18 @@ try:
     from openai import RateLimitError, APIError
 except Exception as exc:
     # Two distinct failure modes land here and shouldn't be conflated: no LLM provider
-    # key configured (the validator names the three keys) versus any other import-time
+    # key configured (the validator names the provider keys) versus any other import-time
     # failure (e.g. a missing system library). Only show the key-setup steps when the
     # exception actually names a provider key.
-    _key_names = ("NVIDIA_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY")
+    _key_names = ("GEMINI_API_KEY", "CEREBRAS_API_KEY", "NVIDIA_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY")
     if any(k in str(exc) for k in _key_names):
         st.error("Configuration error")
         st.markdown(
             "Verishelf can't start because no **LLM provider key** is set.\n\n"
             "1. Copy `.env.example` to `.env`\n"
-            "2. Add at least one free key — `NVIDIA_API_KEY` ([build.nvidia.com](https://build.nvidia.com)), "
+            "2. Add at least one free key — `GEMINI_API_KEY` ([aistudio.google.com](https://aistudio.google.com)), "
+            "`CEREBRAS_API_KEY` ([cloud.cerebras.ai](https://cloud.cerebras.ai)), "
+            "`NVIDIA_API_KEY` ([build.nvidia.com](https://build.nvidia.com)), "
             "`GROQ_API_KEY` ([console.groq.com](https://console.groq.com)), or "
             "`OPENROUTER_API_KEY` ([openrouter.ai/keys](https://openrouter.ai/keys))\n"
             "3. Restart the app"

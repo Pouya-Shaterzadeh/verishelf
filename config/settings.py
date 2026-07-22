@@ -9,10 +9,14 @@ class Settings(BaseSettings):
     # the next. A provider is "active" only if its API key is set; at least one is
     # required (enforced below). All are OpenAI-compatible, so the client is uniform -
     # only the base URL and model ID differ per provider.
+    GEMINI_API_KEY: str = ""
+    CEREBRAS_API_KEY: str = ""
     NVIDIA_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
 
+    GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    CEREBRAS_BASE_URL: str = "https://api.cerebras.ai/v1"
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
@@ -23,48 +27,57 @@ class Settings(BaseSettings):
     # models spend the token budget on hidden chain-of-thought and return empty content
     # on the small max_tokens used here.) OpenRouter has no free Llama, so it uses the
     # free Gemma we validated there.
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    CEREBRAS_MODEL: str = "llama3.1-8b"
     NVIDIA_MODEL: str = "meta/llama-3.1-8b-instruct"
     GROQ_MODEL: str = "llama-3.1-8b-instant"
     OPENROUTER_MODEL: str = "google/gemma-4-26b-a4b-it:free"
 
-    # Failover order. NVIDIA first (no daily cap), then Groq (very fast, ~30 rpm), then
-    # OpenRouter last (50/day free, most limited). Reorder via .env to reprioritize.
-    PROVIDER_ORDER: list = ["nvidia", "groq", "openrouter"]
+    # Failover order, most-generous first so the primary absorbs the most load before
+    # failing over: Gemini (~60 rpm) -> Cerebras (1M tokens/day, very fast) -> NVIDIA
+    # (no daily cap) -> Groq (fast but low token/min cap) -> OpenRouter (50/day, last
+    # resort). Reorder via .env to reprioritize.
+    PROVIDER_ORDER: list = ["gemini", "cerebras", "nvidia", "groq", "openrouter"]
 
     @model_validator(mode="after")
     def _require_a_provider(self):
         if not self.active_providers():
             raise ValueError(
-                "No LLM provider configured. Set at least one of NVIDIA_API_KEY, "
-                "GROQ_API_KEY, or OPENROUTER_API_KEY in .env."
+                "No LLM provider configured. Set at least one of GEMINI_API_KEY, "
+                "CEREBRAS_API_KEY, NVIDIA_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY "
+                "in .env."
             )
         return self
 
+    def _provider_cfg(self) -> dict:
+        """name -> (label, base_url, api_key, model) for every provider."""
+        return {
+            "gemini": ("Gemini", self.GEMINI_BASE_URL, self.GEMINI_API_KEY, self.GEMINI_MODEL),
+            "cerebras": ("Cerebras", self.CEREBRAS_BASE_URL, self.CEREBRAS_API_KEY, self.CEREBRAS_MODEL),
+            "nvidia": ("Nvidia", self.NVIDIA_BASE_URL, self.NVIDIA_API_KEY, self.NVIDIA_MODEL),
+            "groq": ("Groq", self.GROQ_BASE_URL, self.GROQ_API_KEY, self.GROQ_MODEL),
+            "openrouter": ("OpenRouter", self.OPENROUTER_BASE_URL, self.OPENROUTER_API_KEY, self.OPENROUTER_MODEL),
+        }
+
     def active_providers(self) -> list:
         """Configured providers in failover order - only those whose key is set."""
-        cfg = {
-            "nvidia": (self.NVIDIA_BASE_URL, self.NVIDIA_API_KEY, self.NVIDIA_MODEL),
-            "groq": (self.GROQ_BASE_URL, self.GROQ_API_KEY, self.GROQ_MODEL),
-            "openrouter": (self.OPENROUTER_BASE_URL, self.OPENROUTER_API_KEY, self.OPENROUTER_MODEL),
-        }
+        cfg = self._provider_cfg()
         active = []
         for name in self.PROVIDER_ORDER:
-            base, key, model = cfg.get(name, (None, "", None))
+            if name not in cfg:
+                continue
+            label, base, key, model = cfg[name]
             if key:
                 active.append({"name": name, "base_url": base, "api_key": key, "model": model})
         return active
 
     def all_providers(self) -> list:
-        """All three providers (with display label), regardless of whether a key is
-        set - for the status UI. active_providers() is the subset actually used."""
-        rows = [
-            ("nvidia", "Nvidia", self.NVIDIA_BASE_URL, self.NVIDIA_API_KEY, self.NVIDIA_MODEL),
-            ("groq", "Groq", self.GROQ_BASE_URL, self.GROQ_API_KEY, self.GROQ_MODEL),
-            ("openrouter", "OpenRouter", self.OPENROUTER_BASE_URL, self.OPENROUTER_API_KEY, self.OPENROUTER_MODEL),
-        ]
+        """Every provider (with display label), regardless of whether a key is set - for
+        the status UI, in failover order. active_providers() is the subset actually used."""
+        cfg = self._provider_cfg()
         return [
-            {"name": n, "label": lbl, "base_url": b, "api_key": k, "model": m}
-            for (n, lbl, b, k, m) in rows
+            {"name": n, "label": cfg[n][0], "base_url": cfg[n][1], "api_key": cfg[n][2], "model": cfg[n][3]}
+            for n in self.PROVIDER_ORDER if n in cfg
         ]
 
     # Embeddings run locally (free, no API key needed)
