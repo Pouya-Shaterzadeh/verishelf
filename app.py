@@ -769,3 +769,5 @@ if pending:
 
 if question:
     ask(question)
+
+# Deploy marker: clean redeploy to resolve a stale Streamlit Cloud checkout.
