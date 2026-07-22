@@ -41,20 +41,30 @@ st.set_page_config(
 # wrapped so a missing key produces a friendly message instead of a raw traceback.
 try:
     from config import constants
-    from config.settings import settings
     from document_processor.file_handler import DocumentProcessor
     from retriever.builder import RetrieverBuilder
     from agents.workflow import AgentWorkflow
     from openai import RateLimitError, APIError
-except Exception as exc:  # pydantic ValidationError on a missing/blank .env, etc.
-    st.error("Configuration error")
-    st.markdown(
-        "Verishelf can't start, most likely because **`OPENROUTER_API_KEY`** isn't set.\n\n"
-        "1. Copy `.env.example` to `.env`\n"
-        "2. Add your key from [openrouter.ai/keys](https://openrouter.ai/keys) (free to create)\n"
-        "3. Restart the app"
-    )
-    with st.expander("Technical details"):
+except Exception as exc:
+    # Two distinct failure modes land here and shouldn't be conflated: a missing/blank
+    # OPENROUTER_API_KEY (pydantic ValidationError, mentions the field by name) versus
+    # any other import-time failure (e.g. a missing system library a dependency needs).
+    # Only show the API-key remediation steps when the exception actually names it.
+    if "OPENROUTER_API_KEY" in str(exc):
+        st.error("Configuration error")
+        st.markdown(
+            "Verishelf can't start because **`OPENROUTER_API_KEY`** isn't set.\n\n"
+            "1. Copy `.env.example` to `.env`\n"
+            "2. Add your key from [openrouter.ai/keys](https://openrouter.ai/keys) (free to create)\n"
+            "3. Restart the app"
+        )
+    else:
+        st.error("Startup error")
+        st.markdown(
+            "Verishelf failed to start due to an unexpected error during setup "
+            "(not the API key). See the technical details below."
+        )
+    with st.expander("Technical details", expanded=True):
         st.exception(exc)
     st.stop()
 
@@ -570,7 +580,6 @@ with st.sidebar:
     st.markdown(
         f"""
         <dl class="vs-meta" style="margin-top: 1.4rem;">
-            <div class="vs-kv"><dt>Engine</dt><dd><a href="https://openrouter.ai">{settings.RESEARCH_MODEL}</a></dd></div>
             <div class="vs-kv"><dt>Retriever</dt><dd>bm25 &oplus; chroma</dd></div>
             <div class="vs-kv"><dt>Rate</dt><dd>20/min &middot; 50/day</dd></div>
         </dl>
