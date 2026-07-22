@@ -314,6 +314,12 @@ st.markdown(
     .vs-key { font-size: 0.8rem; font-weight: 600; margin: 0.5rem 0 0.15rem; letter-spacing: 0.01em; }
     .vs-key--ok { color: var(--verified); }
     .vs-key--bad { color: var(--flagged); }
+    .vs-key-hint { font-size: 0.72rem; color: var(--text-soft); margin: 0.45rem 0 0; }
+    .vs-key-hint kbd {
+        font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: var(--text);
+        background: var(--bg-raised); border: 1px solid var(--rule); border-radius: 3px;
+        padding: 0.05rem 0.32rem; margin: 0 0.05rem;
+    }
     .vs-key-note { font-size: 0.68rem; color: var(--text-soft); line-height: 1.5; margin-top: 0.35rem; }
     .vs-key-note a { color: var(--accent) !important; white-space: nowrap; }
 
@@ -651,8 +657,13 @@ with st.sidebar:
                 "Model", value=st.session_state.model or "gpt-4o-mini",
                 label_visibility="collapsed", help="Type a chat model ID your key can use.",
             )
-    elif st.session_state.key_msg:
-        st.markdown(f'<div class="vs-key vs-key--bad">✕ {html.escape(st.session_state.key_msg)}</div>', unsafe_allow_html=True)
+    else:
+        # Not yet active: show any validation error, plus a clear "how to submit" hint
+        # in its own line below the field (Streamlit's built-in hint overlaps the eye
+        # icon, so it's hidden via CSS and replaced by this).
+        if st.session_state.key_msg:
+            st.markdown(f'<div class="vs-key vs-key--bad">✕ {html.escape(st.session_state.key_msg)}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="vs-key-hint">Paste your key, then press <kbd>Enter</kbd> to apply.</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="vs-key-note">Stored only in this browser session — never saved or logged. '
         '<a href="https://platform.openai.com/api-keys" target="_blank">Get a key ↗</a></div>',
