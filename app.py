@@ -156,6 +156,11 @@ st.markdown(
         --hover-text: #F8F5F0;
     }
 
+    /* Base font size bumped from the 16px default so every rem-based size in the app
+       scales up proportionally to a more comfortable reading size, without having to
+       touch each element. */
+    html { font-size: 17.5px; }
+
     /* Sidebar locked to a fixed width - no drag-resize - but collapsing is still
        allowed via Streamlit's own collapse/reopen buttons. The width rule is
        scoped to [aria-expanded="true"] only: Streamlit toggles that attribute
