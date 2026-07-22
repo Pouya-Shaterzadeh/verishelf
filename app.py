@@ -169,10 +169,17 @@ st.markdown(
        hit-area for that same handle that carries its cursor as an inline style
        rather than a class, caught here by attribute selector so it doesn't
        depend on a hashed/target class name. */
-    [data-testid="stSidebar"][aria-expanded="true"] {
-        width: 452px !important;
-        min-width: 452px !important;
-        max-width: 452px !important;
+    /* The 452px lock is desktop-only. This pinned Streamlit version does NOT turn
+       the sidebar into an overlay on small screens (verified against vanilla
+       Streamlit) - the expanded sidebar stays in the flex row and shoves the main
+       column off-screen. So below the breakpoint we take over and make the sidebar
+       a fixed overlay ourselves (see the max-width: 640px block further down). */
+    @media (min-width: 641px) {
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            width: 452px !important;
+            min-width: 452px !important;
+            max-width: 452px !important;
+        }
     }
     .eelgd2m3,
     [data-testid="stSidebar"] [style*="resize"] {
@@ -180,13 +187,42 @@ st.markdown(
         pointer-events: none !important;
     }
 
-    /* Sidebar locked to its default scroll position - no scrolling at all, so it
-       can't drift from the top. Targets both the stable data-testid and the
+    /* Mobile: turn the sidebar into a fixed overlay drawer. position:fixed pulls it
+       out of the flex row so the main column reclaims full width (otherwise it's
+       squeezed to a sliver and its text runs off-screen). The high z-index is
+       already set by Streamlit (sidebarMobile). Width is a comfortable share of the
+       viewport, capped so it never gets absurdly wide on a large phone/tablet. */
+    @media (max-width: 640px) {
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            height: 100% !important;
+            width: 85vw !important;
+            max-width: 22rem !important;
+            box-shadow: 0 0 0 100vmax rgba(24, 17, 12, 0.35);
+        }
+        /* Collapsed: fully off-canvas so it never contributes layout width. */
+        [data-testid="stSidebar"][aria-expanded="false"] {
+            position: fixed !important;
+            width: 0 !important;
+            min-width: 0 !important;
+        }
+    }
+
+    /* Sidebar locked to its default scroll position on desktop, where the fixed
+       452px width gives the content enough room to fit without scrolling. On
+       mobile the sidebar becomes a full-width overlay drawer with much less
+       vertical room (short viewport), so the same lock would clip content
+       (uploader, sample list, footer) below the fold with no way to reach it -
+       scrolling stays enabled there. Targets both the stable data-testid and the
        underlying scroll container's emotion "target" class (eelgd2m2 in this
        pinned Streamlit version) as a fallback. */
-    [data-testid="stSidebarUserContent"],
-    .eelgd2m2 {
-        overflow: hidden !important;
+    @media (min-width: 641px) {
+        [data-testid="stSidebarUserContent"],
+        .eelgd2m2 {
+            overflow: hidden !important;
+        }
     }
 
     [data-testid="stMainBlockContainer"] { max-width: 860px; padding-top: 2.5rem; }
@@ -207,7 +243,9 @@ st.markdown(
         font-family: 'Newsreader', serif;
         font-style: italic;
         font-weight: 600;
-        font-size: 3.1rem;
+        /* Fluid instead of a fixed 3.1rem - scales down on phones without a
+           separate breakpoint, never gets larger than the desktop size. */
+        font-size: clamp(2rem, 6vw + 1rem, 3.1rem);
         letter-spacing: -0.01em;
         color: var(--text);
         margin: 0 0 0.6rem;
@@ -234,6 +272,14 @@ st.markdown(
         .vs-rail { flex-direction: column; }
         .vs-rail__step { border-left: none; padding-left: 0; border-top: 1px solid var(--rule); padding-top: 1rem; margin-top: 1rem; }
         .vs-rail__step:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
+        /* Citation rows and footer key/value pairs go from a tight side-by-side
+           layout to stacked - at 452px sidebar width these already have room, but
+           the main-column citations under each answer don't below ~640px. */
+        .vs-citation, .vs-kv { flex-direction: column; gap: 0.15rem; }
+        .vs-citation .vs-citation__score, .vs-kv dd { text-align: left; }
+
+        [data-testid="stMainBlockContainer"] { padding-top: 1.5rem; }
     }
 
     /* ---- Sidebar ---- */
