@@ -180,6 +180,15 @@ st.markdown(
         pointer-events: none !important;
     }
 
+    /* Sidebar locked to its default scroll position - no scrolling at all, so it
+       can't drift from the top. Targets both the stable data-testid and the
+       underlying scroll container's emotion "target" class (eelgd2m2 in this
+       pinned Streamlit version) as a fallback. */
+    [data-testid="stSidebarUserContent"],
+    .eelgd2m2 {
+        overflow: hidden !important;
+    }
+
     [data-testid="stMainBlockContainer"] { max-width: 860px; padding-top: 2.5rem; }
 
     .vs-mono, .vs-eyebrow, .vs-stamp, .vs-masthead,
